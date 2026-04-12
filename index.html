@@ -20,6 +20,13 @@
     <div
       class="max-w-7xl w-full bg-slate-800/80 backdrop-blur-xl rounded-3xl shadow-2xl p-10 border border-slate-700/50"
     >
+      <div class="flex justify-end mb-10">
+        <button
+          onclick="logout()"
+          class="text-slate-300 font-medium tracking-wide"
+          >logout</button
+        >
+      </div>
       <div class="text-center mb-10">
         <h1
           class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 tracking-tight"
@@ -133,6 +140,13 @@
           });
           tr.appendChild(td);
           tbl.appendChild(tr);
+        }
+      }
+      async function logout() {
+        const res = await fetch("/api/v1/logout", { method: "POST" });
+        const data = await res.json();
+        if (data.success) {
+          window.location.href = "/login.html";
         }
       }
       run();

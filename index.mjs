@@ -11,6 +11,17 @@ import pg from "pg";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
+// ---------------------------------------------
+import dotenv from "dotenv";
+import authentication from "./src/routers/auth.route.js"
+import healthCheck from "./src/routers/helthCheck.route.js"
+import cookieParser from "cookie-parser";
+import { verifyJWT } from "./src/middleware/auth.middleware.js";
+
+
+dotenv.config();
+
+// --------------------------------------------
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,9 +33,9 @@ const port = process.env.PORT || 8080;
 // the pooler will keep that connection open for sometime to other clients to reuse
 const pool = new pg.Pool({
   host: "localhost",
-  port: 5433,
-  user: "postgres",
-  password: "postgres",
+  port: 5432,
+  user: "user",
+  password: "password",
   database: "sql_class_2_db",
   max: 20,
   connectionTimeoutMillis: 0,
@@ -34,11 +45,25 @@ const pool = new pg.Pool({
 const app = new express();
 app.use(cors());
 
-app.get("/", (req, res) => {
+// --------------------
+// added code from my side 
+
+app.use(cookieParser());
+export { pool };
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(__dirname, { index: false })); 
+
+app.use("/api/v1", authentication);
+app.use("/api/healthCheck", healthCheck);
+
+// --------------------
+
+app.get("/", verifyJWT, (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 //get all seats
-app.get("/seats", async (req, res) => {
+app.get("/seats", verifyJWT, async (req, res) => {
   const result = await pool.query("select * from seats"); // equivalent to Seats.find() in mongoose
   res.send(result.rows);
 });
@@ -82,5 +107,6 @@ app.put("/:id/:name", async (req, res) => {
     res.send(500);
   }
 });
+
 
 app.listen(port, () => console.log("Server starting on port: " + port));
