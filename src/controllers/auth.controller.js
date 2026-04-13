@@ -1,7 +1,7 @@
 import ApiError from "../utils/Api.Error.js";
 import ApiResponse from "../utils/Api.Responce.js"
 import { pool } from "../../index.mjs";
-import pg from "pg";
+// import pg from "pg";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken";
@@ -29,6 +29,21 @@ function generateRefreshToken(user) {
     );
 }
 
+
+/* 
+
+@params {name, email, password}
+@description User Registration
+@route POST /api/v1/register
+@access public
+@returns {user, accessToken, refreshToken}
+    user: {id, name, email}
+    accessToken: string
+    refreshToken: string
+@success 201
+@error 400, 409, 500
+
+*/
 
 const registration = asyncHandler(async (req, res) => {
     const { name, email, password } = req.body;
@@ -66,6 +81,22 @@ const registration = asyncHandler(async (req, res) => {
 
     return ApiResponse.created(res, "User Registration Completed", newUser.rows[0]);
 });
+
+
+/* 
+
+@params {email, password}
+@description User Login
+@route POST /api/v1/login
+@access public
+@returns {user, accessToken, refreshToken}
+    user: {id, name, email}
+    accessToken: string
+    refreshToken: string
+@success 200
+@error 400, 404, 500
+
+*/
 
 const login = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
@@ -109,6 +140,19 @@ const login = asyncHandler(async (req, res) => {
         accessToken
     });
 });
+
+
+/* 
+
+@params {}
+@description User Logout
+@route POST /api/v1/logout
+@access private
+@returns {}
+@success 200
+@error 400, 404, 500
+
+*/
 
 const logout = asyncHandler(async (req, res) => {
     const conn = await pool.connect();

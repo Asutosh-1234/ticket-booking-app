@@ -9,6 +9,20 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+
+/* 
+This is a middleware to verify Access Token
+
+@params {req, res, next}
+@description Verify JWT
+@access private
+@returns {req.user}
+@success 200
+@error return login.html
+
+*/
+
+
 export const verifyJWT = asyncHandler(async (req, res, next) => {
     try {
         const token = req.cookies?.AccessToken || req.header("Authorization")?.replace("Bearer ", "");
