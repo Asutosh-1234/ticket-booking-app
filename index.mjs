@@ -21,6 +21,17 @@ import { verifyJWT } from "./src/middleware/auth.middleware.js";
 
 dotenv.config();
 
+app.use((err, req, res, next) => {
+    const status = err.statusCode || 500;
+    const message = err.message || "Internal server error";
+    
+    res.status(status).json({
+        success: false,
+        message
+    });
+});
+
+
 // --------------------------------------------
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

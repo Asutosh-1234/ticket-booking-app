@@ -1,7 +1,6 @@
 import ApiError from "../utils/Api.Error.js";
 import ApiResponse from "../utils/Api.Responce.js"
 import { pool } from "../../index.mjs";
-// import pg from "pg";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken";
@@ -9,6 +8,7 @@ import jwt from "jsonwebtoken";
 async function hashPassword(pass) {
     return bcrypt.hash(pass, 10);
 }
+
 function generateAccessToken(user) {
     return jwt.sign(
         {
@@ -29,37 +29,36 @@ function generateRefreshToken(user) {
     );
 }
 
+const cookieOptions = {
+    httpOnly: true,
+    secure: true
+}
 
 /* 
-
 @params {name, email, password}
 @description User Registration
 @route POST /api/v1/register
 @access public
 @returns {user, accessToken, refreshToken}
-    user: {id, name, email}
-    accessToken: string
-    refreshToken: string
 @success 201
 @error 400, 409, 500
-
 */
-
 const registration = asyncHandler(async (req, res) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-        throw ApiError.badRequestError(res);
+        throw ApiError.badRequestError();
     }
 
     const conn = await pool.connect();
 
-    const sql = 'SELECT * FROM users WHERE email = $1 AND name = $2';
-    const data = await conn.query(sql, [email, name]);
+    // fix: check by email only, not email+name
+    const sql = 'SELECT * FROM users WHERE email = $1';
+    const data = await conn.query(sql, [email]);
 
     if (data.rows.length > 0) {
         conn.release();
-        throw ApiError.conflictError(res, "User Already Exists");
+        throw ApiError.conflictError("User Already Exists");
     }
 
     const hashedPassword = await hashPassword(password);
@@ -72,37 +71,39 @@ const registration = asyncHandler(async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    const set_refreshToken = 'UPDATE users SET refresh_token = $1 WHERE id = $2';
-    await conn.query(set_refreshToken, [refreshToken, user.id]);
+    await conn.query(
+        'UPDATE users SET refresh_token = $1 WHERE id = $2',
+        [refreshToken, user.id]
+    );
 
     conn.release();
 
-    res.cookie('AccessToken', accessToken, { httpOnly: true });
+    // fix: send both tokens as cookies
+    res.cookie('accessToken', accessToken, cookieOptions);
+    res.cookie('refreshToken', refreshToken, cookieOptions);
 
-    return ApiResponse.created(res, "User Registration Completed", newUser.rows[0]);
+    // fix: delete sensitive fields before sending
+    delete user.password;
+    delete user.refresh_token;
+
+    // fix: send `user` not `newUser.rows[0]`
+    return ApiResponse.created(res, "User Registration Completed", user);
 });
 
-
 /* 
-
 @params {email, password}
 @description User Login
 @route POST /api/v1/login
 @access public
 @returns {user, accessToken, refreshToken}
-    user: {id, name, email}
-    accessToken: string
-    refreshToken: string
 @success 200
 @error 400, 404, 500
-
 */
-
 const login = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-        throw ApiError.badRequestError(res);
+        throw ApiError.badRequestError();
     }
 
     const conn = await pool.connect();
@@ -112,7 +113,7 @@ const login = asyncHandler(async (req, res) => {
 
     if (result.rows.length === 0) {
         conn.release();
-        throw ApiError.notFoundError(res);
+        throw ApiError.notFoundError("User not found");
     }
 
     const user = result.rows[0];
@@ -120,7 +121,7 @@ const login = asyncHandler(async (req, res) => {
 
     if (!isPasswordMatch) {
         conn.release();
-        throw ApiError.badRequestError(res, "Password is Not correct");
+        throw ApiError.badRequestError("Password is incorrect");
     }
 
     const accessToken = generateAccessToken(user);
@@ -133,7 +134,9 @@ const login = asyncHandler(async (req, res) => {
 
     conn.release();
 
-    res.cookie('AccessToken', accessToken, { httpOnly: true });
+    // fix: consistent cookie name + send refreshToken too
+    res.cookie('accessToken', accessToken, cookieOptions);
+    res.cookie('refreshToken', refreshToken, cookieOptions);
 
     return ApiResponse.ok(res, "Login Successful", {
         user: { id: user.id, name: user.name, email: user.email },
@@ -141,9 +144,7 @@ const login = asyncHandler(async (req, res) => {
     });
 });
 
-
 /* 
-
 @params {}
 @description User Logout
 @route POST /api/v1/logout
@@ -151,9 +152,7 @@ const login = asyncHandler(async (req, res) => {
 @returns {}
 @success 200
 @error 400, 404, 500
-
 */
-
 const logout = asyncHandler(async (req, res) => {
     const conn = await pool.connect();
 
@@ -162,16 +161,15 @@ const logout = asyncHandler(async (req, res) => {
         [req.user.id]
     );
 
-    const options = {
-        httpOnly: true,
-        secure: true
-    }
-    res
-        .clearCookie("accessToken", options)
-        .clearCookie("refreshToken", options)
     conn.release();
-    return ApiResponse.ok(res, "User logged Out", {})
-})
+
+    // fix: consistent cookie names, both cleared
+    res
+        .clearCookie("accessToken", cookieOptions)
+        .clearCookie("refreshToken", cookieOptions);
+
+    return ApiResponse.ok(res, "User logged Out", {});
+});
 
 export {
     registration,
